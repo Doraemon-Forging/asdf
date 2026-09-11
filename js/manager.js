@@ -9,6 +9,10 @@ const ProfileManager = {
     state: { active: null, profiles: {} },
 
     init() {
+
+        const preloadIcons = ['icons/accedit.png', 'icons/accdelete.png', 'icons/accadd.png'];
+        preloadIcons.forEach(src => { const img = new Image(); img.src = src; });
+
         const savedProfiles = localStorage.getItem(this.storageKey);
         if (savedProfiles) {
             this.state = JSON.parse(savedProfiles);
@@ -51,13 +55,46 @@ const ProfileManager = {
 
     switchProfile(id, skipSave = false) {
         if (id === this.state.active || !this.state.profiles[id]) return;
+
+        // FIX: Clear pending save timer to prevent cross-account contamination (Race Condition)
+        if (typeof saveTimeout !== 'undefined') {
+            clearTimeout(saveTimeout);
+        }
+
         if (!skipSave && typeof captureFullState === 'function') {
             this.saveCurrent(captureFullState());
         }
 
         this.state.active = id;
         this.saveToStorage();
-        window.location.reload();
+        
+        if (typeof setupLevels !== 'undefined') Object.keys(setupLevels).forEach(k => delete setupLevels[k]);
+        if (typeof planQueue !== 'undefined') planQueue.length = 0;
+        if (typeof eggPlanQueue !== 'undefined') eggPlanQueue.length = 0;
+
+        const newData = this.getActiveData();
+        
+        if (newData && typeof loadState === 'function') {
+            loadState(newData);
+        } else {
+            // Handle switching to a brand new profile
+            const nowIso = new Date().toISOString().slice(0, 16);
+            if (typeof safeSetVal === 'function') {
+                safeSetVal('start-date', nowIso); 
+                safeSetVal('calc-start-date', nowIso); 
+                safeSetVal('egg-date-desktop', nowIso);
+            }
+            if (typeof updateCalculations === 'function') updateCalculations(); 
+            if (typeof updateDaily === 'function') updateDaily(); 
+            if (typeof updateWeekly === 'function') updateWeekly();
+            if (typeof updateWarCalc === 'function') updateWarCalc();
+        }
+
+        this.closeModal();
+        
+        if (typeof activeTreeKey !== 'undefined' && typeof switchTree === 'function') {
+            switchTree(activeTreeKey);
+        }
     },
 
     createProfile(name) {

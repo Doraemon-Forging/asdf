@@ -856,6 +856,8 @@ function markDone(targetIdx, timestamp) {
         expandedLogIndex = -1; 
         
         if (typeof syncMainDate === 'function') syncMainDate(localIso);
+        
+        if (typeof saveToLocalStorage === 'function') saveToLocalStorage();
 
         setTimeout(() => {
             const wrappers =[
