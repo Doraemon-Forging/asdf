@@ -56,7 +56,6 @@ const ProfileManager = {
     switchProfile(id, skipSave = false) {
         if (id === this.state.active || !this.state.profiles[id]) return;
 
-        // FIX: Clear pending save timer to prevent cross-account contamination (Race Condition)
         if (typeof saveTimeout !== 'undefined') {
             clearTimeout(saveTimeout);
         }
@@ -77,7 +76,7 @@ const ProfileManager = {
         if (newData && typeof loadState === 'function') {
             loadState(newData);
         } else {
-            // Handle switching to a brand new profile
+
             const nowIso = new Date().toISOString().slice(0, 16);
             if (typeof safeSetVal === 'function') {
                 safeSetVal('start-date', nowIso); 
@@ -94,6 +93,9 @@ const ProfileManager = {
         
         if (typeof activeTreeKey !== 'undefined' && typeof switchTree === 'function') {
             switchTree(activeTreeKey);
+        }
+        if (typeof updateUndoRedoBtns === 'function') {
+            updateUndoRedoBtns();
         }
     },
 

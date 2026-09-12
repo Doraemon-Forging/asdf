@@ -463,6 +463,9 @@ function loadState(d) {
             safeSetVal('weekly-league', d.weeklyData.league); safeSetVal('weekly-rank', d.weeklyData.rank);
             
             if (d.weeklyData.leagueMode !== undefined) safeSetVal('weekly-league-mode', d.weeklyData.leagueMode);
+            
+            if (typeof updateSecondaryLeagueOptions === 'function') updateSecondaryLeagueOptions();
+
             if (d.weeklyData.league2 !== undefined) safeSetVal('weekly-league-2', d.weeklyData.league2);
             if (d.weeklyData.rank2 !== undefined) safeSetVal('weekly-rank-2', d.weeklyData.rank2);
 
@@ -489,8 +492,7 @@ function loadState(d) {
             safeSetVal('asc-mount-lv', d.weeklyData.ascMountLv); safeSetVal('asc-mount-exp', d.weeklyData.ascMountExp); safeSetVal('asc-mount-inv', d.weeklyData.ascMountInv);
             if (d.weeklyData.ascMountTargetAsc !== undefined) safeSetVal('asc-mount-target-asc', d.weeklyData.ascMountTargetAsc);
             safeSetVal('asc-mount-target-lv', d.weeklyData.ascMountTargetLv);
-            
-            // Re-toggle UI visibility for league mode
+
             if (typeof toggleLeagueMode === 'function') toggleLeagueMode();
         }
     } catch (e) {}
