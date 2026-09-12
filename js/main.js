@@ -763,7 +763,7 @@ function downloadData() {
     
     const a = document.createElement('a'); 
     a.href = URL.createObjectURL(new Blob([JSON.stringify(allProfilesData)], { type: 'application/json' })); 
-    a.download = 'TechMultiAcc.json'; 
+    a.download = 'test_asdf.json'; 
     a.click(); 
 }
 

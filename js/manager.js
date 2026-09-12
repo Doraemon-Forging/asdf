@@ -1,15 +1,15 @@
 /**
  * MANAGER.JS
- * Handles multi-profile saving, loading, migration, and UI rendering.
+ * Handles multi-profile saving, loading, migration, UI rendering, and reordering.
  */
 
 const ProfileManager = {
     storageKey: 'techPlannerProfiles',
     legacyKey: 'techPlannerData',
     state: { active: null, profiles: {} },
+    expandedProfileId: null, 
 
     init() {
-
         const preloadIcons = ['icons/accedit.png', 'icons/accdelete.png', 'icons/accadd.png'];
         preloadIcons.forEach(src => { const img = new Image(); img.src = src; });
 
@@ -54,7 +54,14 @@ const ProfileManager = {
     },
 
     switchProfile(id, skipSave = false) {
-        if (id === this.state.active || !this.state.profiles[id]) return;
+
+        const wasExpanded = this.expandedProfileId !== null;
+        this.expandedProfileId = null; 
+
+        if (id === this.state.active || !this.state.profiles[id]) {
+            if (wasExpanded) this.renderModal(); 
+            return;
+        }
 
         if (typeof saveTimeout !== 'undefined') {
             clearTimeout(saveTimeout);
@@ -63,40 +70,10 @@ const ProfileManager = {
         if (!skipSave && typeof captureFullState === 'function') {
             this.saveCurrent(captureFullState());
         }
-
         this.state.active = id;
         this.saveToStorage();
-        
-        if (typeof setupLevels !== 'undefined') Object.keys(setupLevels).forEach(k => delete setupLevels[k]);
-        if (typeof planQueue !== 'undefined') planQueue.length = 0;
-        if (typeof eggPlanQueue !== 'undefined') eggPlanQueue.length = 0;
 
-        const newData = this.getActiveData();
-        
-        if (newData && typeof loadState === 'function') {
-            loadState(newData);
-        } else {
-
-            const nowIso = new Date().toISOString().slice(0, 16);
-            if (typeof safeSetVal === 'function') {
-                safeSetVal('start-date', nowIso); 
-                safeSetVal('calc-start-date', nowIso); 
-                safeSetVal('egg-date-desktop', nowIso);
-            }
-            if (typeof updateCalculations === 'function') updateCalculations(); 
-            if (typeof updateDaily === 'function') updateDaily(); 
-            if (typeof updateWeekly === 'function') updateWeekly();
-            if (typeof updateWarCalc === 'function') updateWarCalc();
-        }
-
-        this.closeModal();
-        
-        if (typeof activeTreeKey !== 'undefined' && typeof switchTree === 'function') {
-            switchTree(activeTreeKey);
-        }
-        if (typeof updateUndoRedoBtns === 'function') {
-            updateUndoRedoBtns();
-        }
+        window.location.reload();
     },
 
     createProfile(name) {
@@ -123,6 +100,7 @@ const ProfileManager = {
             const isDeletingActive = (this.state.active === id);
 
             delete this.state.profiles[id];
+            if (this.expandedProfileId === id) this.expandedProfileId = null;
             
             if (isDeletingActive) {
                 const fallbackId = Object.keys(this.state.profiles)[0];
@@ -134,7 +112,35 @@ const ProfileManager = {
         }
     },
 
+    toggleProfileMenu(id) {
+        this.expandedProfileId = (this.expandedProfileId === id) ? null : id;
+        this.renderModal();
+    },
+
+    moveProfile(id, direction) {
+        const entries = Object.entries(this.state.profiles);
+        const idx = entries.findIndex(e => e[0] === id);
+        if (idx === -1) return;
+
+        if (direction === 'up' && idx > 0) {
+            const temp = entries[idx - 1];
+            entries[idx - 1] = entries[idx];
+            entries[idx] = temp;
+        } else if (direction === 'down' && idx < entries.length - 1) {
+            const temp = entries[idx + 1];
+            entries[idx + 1] = entries[idx];
+            entries[idx] = temp;
+        } else {
+            return;
+        }
+
+        this.state.profiles = Object.fromEntries(entries);
+        this.saveToStorage();
+        this.renderModal();
+    },
+
     openModal() {
+        this.expandedProfileId = null;
         this.renderModal();
     },
 
@@ -155,36 +161,56 @@ const ProfileManager = {
 
         const textFormat = `font-family: 'Fredoka', sans-serif !important; font-size: 1rem !important; color: #000000 !important; -webkit-text-stroke: 0px transparent !important; text-shadow: none !important; font-weight: 600 !important; letter-spacing: 0.5px;`;
         
-        const blueBtnStyle = `padding: 6px 12px; border-radius: 8px; border: 2px solid #000; background-color: #00b0ff; cursor: pointer; box-shadow: inset 0 -3px 0 #005680; display: flex; align-items: center; justify-content: center; transition: transform 0.1s;`;
-        const redBtnStyle = `padding: 6px 12px; border-radius: 8px; border: 2px solid #000; background-color: #ff4757; cursor: pointer; box-shadow: inset 0 -3px 0 #c0392b; display: flex; align-items: center; justify-content: center; transition: transform 0.1s;`;
+        const gearBtnStyle = `padding: 6px 12px; border-radius: 8px; border: 2px solid #000; background-color: #00b0ff; cursor: pointer; box-shadow: inset 0 -3px 0 #005680; display: flex; align-items: center; justify-content: center; transition: transform 0.1s;`;
         const addBtnStyle = `padding: 8px 14px; border-radius: 8px; border: 2px solid #000; background-color: #00b0ff; cursor: pointer; box-shadow: inset 0 -3px 0 #005680; display: flex; align-items: center; justify-content: center; transition: transform 0.1s;`;
 
         let listHtml = '<div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">';
         
-        Object.keys(this.state.profiles).forEach(id => {
+        const profileKeys = Object.keys(this.state.profiles);
+
+        profileKeys.forEach((id, index) => {
             const p = this.state.profiles[id];
             const isActive = id === this.state.active;
+            const isExpanded = id === this.expandedProfileId;
             
             const bg = isActive ? '#ccf0ff' : '#f2f2f2'; 
             const borderStyle = isActive ? 'border: 2px solid #00b0ff;' : 'border: 2px solid transparent;';
             const iconHtml = isActive ? `<span style="color: #00b0ff; font-size: 1.1rem; margin-right: 8px; -webkit-text-stroke: 0px;">▶</span>` : '';
             
             listHtml += `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-radius: 8px; background-color: ${bg}; ${borderStyle}">
-                    <div style="flex-grow: 1; ${textFormat} cursor: pointer; display: flex; align-items: center;" onclick="ProfileManager.switchProfile('${id}')">
-                        ${iconHtml}${p.name}
+                <div style="display: flex; flex-direction: column; padding: 10px 15px; border-radius: 8px; background-color: ${bg}; ${borderStyle}">
+                    
+                    <!-- Main Row -->
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="flex-grow: 1; ${textFormat} cursor: pointer; display: flex; align-items: center;" onclick="ProfileManager.switchProfile('${id}')">
+                            ${iconHtml}${p.name}
+                        </div>
+                        <div>
+                            <button onclick="ProfileManager.toggleProfileMenu('${id}')" style="${gearBtnStyle}" onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='inset 0 -1px 0 #005680';" onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';" title="Options">
+                                <img src="icons/accedit.png" style="width: 20px; height: 20px; object-fit: contain;">
+                            </button>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 8px;">
-                        <button onclick="const n = prompt('New name:', '${p.name}'); if(n) ProfileManager.renameProfile('${id}', n)" style="${blueBtnStyle}" onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='inset 0 -1px 0 #005680';" onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';" title="Edit Name">
-                            <img src="icons/accedit.png" style="width: 20px; height: 20px; object-fit: contain;">
-                        </button>
-                        <button onclick="ProfileManager.deleteProfile('${id}')" style="${redBtnStyle} ${Object.keys(this.state.profiles).length === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}" onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='inset 0 -1px 0 #c0392b';" onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #c0392b';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #c0392b';" title="Delete" ${Object.keys(this.state.profiles).length === 1 ? 'disabled' : ''}>
-                            <img src="icons/accdelete.png" style="width: 20px; height: 20px; object-fit: contain;">
-                        </button>
-                    </div>
-                </div>
             `;
+
+            if (isExpanded) {
+                const disableUp = (index === 0);
+                const disableDown = (index === profileKeys.length - 1);
+                const disableDelete = (profileKeys.length === 1);
+
+                listHtml += `
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(0,0,0,0.1);">
+                        <button class="btn-game-ctrl btn-move" onclick="ProfileManager.moveProfile('${id}', 'up')" ${disableUp ? 'style="opacity:0.4; pointer-events:none;"' : ''}>UP</button>
+                        <button class="btn-game-ctrl btn-insert" onclick="ProfileManager.moveProfile('${id}', 'down')" ${disableDown ? 'style="opacity:0.4; pointer-events:none;"' : ''}>DOWN</button>
+                        <button class="btn-game-ctrl btn-done" onclick="const n = prompt('New name:', '${p.name}'); if(n) ProfileManager.renameProfile('${id}', n)">RENAME</button>
+                        <button class="btn-game-ctrl btn-del" onclick="ProfileManager.deleteProfile('${id}')" ${disableDelete ? 'style="opacity:0.4; pointer-events:none;"' : ''}>DELETE</button>
+                    </div>
+                `;
+            }
+
+            listHtml += `</div>`; 
         });
+        
         listHtml += '</div>';
 
         const bodyContentHTML = `
