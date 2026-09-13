@@ -54,7 +54,6 @@ const ProfileManager = {
     },
 
     switchProfile(id, skipSave = false) {
-
         const wasExpanded = this.expandedProfileId !== null;
         this.expandedProfileId = null; 
 
@@ -73,6 +72,8 @@ const ProfileManager = {
         this.state.active = id;
         this.saveToStorage();
 
+        window.isSwitchingProfile = true; 
+        
         window.location.reload();
     },
 

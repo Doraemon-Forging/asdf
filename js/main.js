@@ -718,7 +718,10 @@ function safeSyncDropdowns(isoDate, prefix) {
 }
 
 function saveToLocalStorage() {
-    if (!isAppLoaded) return; 
+    if (!typeof isAppLoaded !== 'undefined' && !isAppLoaded) return; 
+    
+    if (window.isSwitchingProfile) return; 
+    
     try { 
         const d = captureFullState(); 
         ProfileManager.saveCurrent(d); 
@@ -733,15 +736,15 @@ function uploadData(el) {
         try { 
             const d = JSON.parse(e.target.result); 
             
-            // Check if this is a multi-account save file
             if (d.profiles && d.active) {
                 ProfileManager.state = d;
                 ProfileManager.saveToStorage();
                 
-                // Reload the page to cleanly initialize the imported active profile
+                window.isSwitchingProfile = true; 
+                
                 window.location.reload();
             } else {
-                // Fallback: If it's an old single-account save file, load it into the current active account
+                
                 loadState(d); 
                 saveToLocalStorage(); 
             }
