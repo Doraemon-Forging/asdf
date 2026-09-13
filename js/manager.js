@@ -69,12 +69,16 @@ const ProfileManager = {
         if (!skipSave && typeof captureFullState === 'function') {
             this.saveCurrent(captureFullState());
         }
+
         this.state.active = id;
         this.saveToStorage();
 
-        window.isSwitchingProfile = true; 
+        if (typeof wipeSlateClean === 'function') wipeSlateClean();
         
-        window.location.reload();
+        const newData = this.getActiveData() || {}; 
+        if (typeof loadState === 'function') loadState(newData);
+
+        this.renderModal();
     },
 
     createProfile(name) {
