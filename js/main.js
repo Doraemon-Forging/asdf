@@ -807,11 +807,14 @@ function uploadData(el) {
                 const newData = ProfileManager.getActiveData() || {};
                 if (typeof loadState === 'function') loadState(newData);
                 
-                ProfileManager.renderModal();
+                ProfileManager.closeModal(); 
             } else {
+
                 if (typeof wipeSlateClean === 'function') wipeSlateClean();
                 loadState(d); 
                 saveToLocalStorage(); 
+                
+                ProfileManager.closeModal(); 
             }
         } catch (err) { 
             alert("Error loading file. Invalid or corrupted data."); 

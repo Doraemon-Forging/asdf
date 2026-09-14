@@ -10,7 +10,7 @@ const ProfileManager = {
     expandedProfileId: null, 
 
     init() {
-        const preloadIcons = ['icons/accedit.png', 'icons/accdelete.png', 'icons/accadd.png'];
+        const preloadIcons = ['icons/accedit.png'];
         preloadIcons.forEach(src => { const img = new Image(); img.src = src; });
 
         const savedProfiles = localStorage.getItem(this.storageKey);
@@ -23,7 +23,7 @@ const ProfileManager = {
                 active: id,
                 profiles: {
                     [id]: {
-                        name: 'Main Account',
+                        name: 'Main Profile',
                         data: legacySave ? JSON.parse(legacySave) : null
                     }
                 }
@@ -43,7 +43,7 @@ const ProfileManager = {
     saveCurrent(data) {
         if (!this.state.active) return;
         if (!this.state.profiles[this.state.active]) {
-            this.state.profiles[this.state.active] = { name: 'Main Account', data: null };
+            this.state.profiles[this.state.active] = { name: 'Main Profile', data: null };
         }
         this.state.profiles[this.state.active].data = data;
         this.saveToStorage();
@@ -57,7 +57,12 @@ const ProfileManager = {
         const wasExpanded = this.expandedProfileId !== null;
         this.expandedProfileId = null; 
 
-        if (id === this.state.active || !this.state.profiles[id]) {
+        if (id === this.state.active) {
+            this.closeModal();
+            return;
+        }
+
+        if (!this.state.profiles[id]) {
             if (wasExpanded) this.renderModal(); 
             return;
         }
@@ -78,7 +83,7 @@ const ProfileManager = {
         const newData = this.getActiveData() || {}; 
         if (typeof loadState === 'function') loadState(newData);
 
-        this.renderModal();
+        this.closeModal();
     },
 
     createProfile(name) {
@@ -88,11 +93,8 @@ const ProfileManager = {
         this.switchProfile(id);
     },
 
-    //Use old save file for new profile
-    promptAccountCreation(name) {
-        if (!name.trim()) return;
-        
-        // Create a custom popup overlay
+    // Handles the New Profile Setup Modal
+    promptAccountCreation(prefillName = '') {
         const overlay = document.createElement('div');
         overlay.style.cssText = `
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -100,16 +102,16 @@ const ProfileManager = {
             z-index: 999999; font-family: 'Fredoka', sans-serif;
         `;
         
-        // Wrapper to handle the floating close button
         const modalWrapper = document.createElement('div');
         modalWrapper.style.cssText = `
             display: flex; flex-direction: column; align-items: center; position: relative;
+            width: 90%; max-width: 380px;
         `;
         
         const modal = document.createElement('div');
         modal.style.cssText = `
             background: #fff; border-radius: 12px; border: 2px solid #000;
-            width: 320px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            width: 100%; box-shadow: 0 8px 16px rgba(0,0,0,0.2);
             display: flex; flex-direction: column; overflow: hidden;
         `;
 
@@ -123,25 +125,25 @@ const ProfileManager = {
             -webkit-text-stroke: 1.5px #000; paint-order: stroke fill; letter-spacing: 1px; text-transform: uppercase;
         `;
         
-        // Updated button style: Fredoka One, 2px black stroke, 700 weight
         const btnStyle = (bg, shadow) => `
             padding: 12px; border-radius: 8px; border: 2px solid #000; background-color: ${bg};
-            cursor: pointer; font-family: 'Fredoka One', 'Fredoka', sans-serif; font-weight: 600; font-size: 1rem; 
-            color: #ffffff; 
+            cursor: pointer; font-family: 'Fredoka One', 'Fredoka', sans-serif; font-weight: 500; font-size: 0.9rem; 
+            color: #ffffff; -webkit-text-stroke: 2.5px #000000; paint-order: stroke fill;
             box-shadow: inset 0 -4px 0 ${shadow}; transition: transform 0.1s; width: 100%; letter-spacing: 0.5px;
         `;
-        
+
         modal.innerHTML = `
             <div style="${headerStyle}">
-                <span style="${titleStyle}">SETUP ACCOUNT</span>
+                <span style="${titleStyle}">SETUP NEW PROFILE</span>
             </div>
             <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 12px;">
-                <button id="btn-brand-new" style="${btnStyle('#00b0ff', '#005680')}">Brand New</button>
+                <input type="text" id="modal-new-account-name" value="${prefillName}" placeholder="New Profile Name" style="width: 100%; box-sizing: border-box; padding: 10px 15px; border-radius: 8px; border: 2px solid #000; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1rem; outline: none; background-color: #ffffff; color: #000; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); -webkit-text-stroke: 0px transparent; margin-bottom: 8px; transition: border-color 0.2s, transform 0.1s;">
+                <button id="btn-brand-new" style="${btnStyle('#00b0ff', '#005680')}">Blank Profile</button>
+                <button id="btn-duplicate" style="${btnStyle('#2ecc71', '#27ae60')}">Copy Existing Profile</button>
                 <button id="btn-import-old" style="${btnStyle('#ffcc00', '#b38f00')}">Import Old Save File</button>
             </div>
         `;
         
-        // Create the floating Red X button
         const closeBtnWrapper = document.createElement('div');
         closeBtnWrapper.style.cssText = `margin-top: -16px; z-index: 10;`;
         
@@ -163,8 +165,10 @@ const ProfileManager = {
         modalWrapper.appendChild(closeBtnWrapper);
         overlay.appendChild(modalWrapper);
         document.body.appendChild(overlay);
+
+        const inputField = document.getElementById('modal-new-account-name');
+        setTimeout(() => inputField.focus(), 50);
         
-        // Add tactile click effects
         const buttons = overlay.querySelectorAll('button');
         buttons.forEach(btn => {
             btn.onmousedown = () => { btn.style.transform = 'translateY(2px)'; };
@@ -172,14 +176,40 @@ const ProfileManager = {
             btn.onmouseleave = () => { btn.style.transform = 'translateY(0)'; };
         });
 
-        // Action: Brand New
+        const getValidName = () => {
+            const name = inputField.value.trim();
+            if (!name) {
+                inputField.style.transform = 'translateX(-5px)';
+                inputField.style.borderColor = '#ff4d4d';
+                setTimeout(() => inputField.style.transform = 'translateX(5px)', 50);
+                setTimeout(() => inputField.style.transform = 'translateX(-5px)', 100);
+                setTimeout(() => {
+                    inputField.style.transform = 'translateX(0)';
+                    inputField.style.borderColor = '#000';
+                }, 150);
+                inputField.focus();
+                return null;
+            }
+            return name;
+        };
+
         document.getElementById('btn-brand-new').onclick = () => {
+            const name = getValidName();
+            if (!name) return;
             document.body.removeChild(overlay);
             this.createProfile(name); 
         };
 
-        // Action: Import Old Save
+        document.getElementById('btn-duplicate').onclick = () => {
+            const name = getValidName();
+            if (!name) return;
+            document.body.removeChild(overlay);
+            this.promptDuplicateSelection(name); 
+        };
+
         document.getElementById('btn-import-old').onclick = () => {
+            const name = getValidName();
+            if (!name) return;
             document.body.removeChild(overlay);
             this.createProfile(name); 
             
@@ -188,22 +218,139 @@ const ProfileManager = {
             fileInput.accept = '.json';
             fileInput.style.display = 'none';
             fileInput.onchange = () => {
-                if (typeof uploadData === 'function') {
-                    uploadData(fileInput); 
-                }
+                if (typeof uploadData === 'function') uploadData(fileInput); 
             };
             document.body.appendChild(fileInput);
             fileInput.click();
             
-            setTimeout(() => { 
-                if (document.body.contains(fileInput)) document.body.removeChild(fileInput); 
-            }, 5000);
+            setTimeout(() => { if (document.body.contains(fileInput)) document.body.removeChild(fileInput); }, 5000);
         };
 
-        // Action: Cancel (Red X)
         document.getElementById('btn-cancel-create').onclick = () => {
             document.body.removeChild(overlay);
         };
+    },
+
+    promptDuplicateSelection(newName) {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+            z-index: 999999; font-family: 'Fredoka', sans-serif;
+        `;
+        
+        const modalWrapper = document.createElement('div');
+        modalWrapper.style.cssText = `
+            display: flex; flex-direction: column; align-items: center; position: relative;
+            width: 90%; max-width: 380px;
+        `;
+        
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: #fff; border-radius: 12px; border: 2px solid #000;
+            width: 100%; box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column; overflow: hidden;
+        `;
+
+        const headerStyle = `
+            background-color: #ebf8fa; padding: 12px; border-bottom: 2px solid #000; 
+            text-align: center; display: flex; justify-content: center; align-items: center;
+        `;
+
+        const titleStyle = `
+            font-family: 'Fredoka', sans-serif; font-size: 1.1rem; font-weight: 700; color: #fff; 
+            -webkit-text-stroke: 1.5px #000; paint-order: stroke fill; letter-spacing: 1px; text-transform: uppercase;
+        `;
+        
+        let listHtml = '<div style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; padding: 4px;">';
+        
+        Object.entries(this.state.profiles).forEach(([id, p]) => {
+            listHtml += `
+                <button class="duplicate-target-btn" data-id="${id}" style="
+                    padding: 10px 15px; border-radius: 8px; border: 2px solid transparent; background-color: #f2f2f2;
+                    cursor: pointer; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1rem; color: #000;
+                    transition: transform 0.1s; width: 100%; text-align: left;
+                    display: flex; align-items: center; outline: none;
+                ">
+                    <span style="-webkit-text-stroke: 0px transparent;">${p.name}</span>
+                </button>
+            `;
+        });
+        listHtml += '</div>';
+
+        modal.innerHTML = `
+            <div style="${headerStyle}">
+                <span style="${titleStyle}">SELECT ACCOUNT</span>
+            </div>
+            <div style="padding: 15px 20px 20px 20px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="text-align: center; font-size: 0.95rem; margin-bottom: 5px; font-family: 'Fredoka', sans-serif !important; font-weight: 600 !important; color: #000000 !important; -webkit-text-stroke: 0px !important; text-shadow: none !important; letter-spacing: 0.5px;">
+                    Choose a profile to copy data from:
+                </div>
+                ${listHtml}
+            </div>
+        `;
+        
+        const closeBtnWrapper = document.createElement('div');
+        closeBtnWrapper.style.cssText = `margin-top: -16px; z-index: 10;`;
+        
+        closeBtnWrapper.innerHTML = `
+            <button id="btn-cancel-duplicate" style="
+                width: 32px; height: 32px; border-radius: 50%; border: 2px solid #000;
+                background-color: #ff4d4d; box-shadow: inset 0 -3px 0 #cc0000;
+                cursor: pointer; display: flex; align-items: center; justify-content: center;
+                transition: transform 0.1s; padding: 0;
+            ">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 1px 0px #000);">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        `;
+        
+        modalWrapper.appendChild(modal);
+        modalWrapper.appendChild(closeBtnWrapper);
+        overlay.appendChild(modalWrapper);
+        document.body.appendChild(overlay);
+        
+        const buttons = overlay.querySelectorAll('button');
+        buttons.forEach(btn => {
+            btn.onmousedown = () => { btn.style.transform = 'translateY(2px)'; };
+            btn.onmouseup = () => { btn.style.transform = 'translateY(0)'; };
+            btn.onmouseleave = () => { btn.style.transform = 'translateY(0)'; };
+        });
+
+        document.getElementById('btn-cancel-duplicate').onclick = () => {
+            document.body.removeChild(overlay);
+            this.promptAccountCreation(newName);  
+        };
+
+        const targetBtns = overlay.querySelectorAll('.duplicate-target-btn');
+        targetBtns.forEach(btn => {
+            btn.onclick = () => {
+                const sourceId = btn.getAttribute('data-id');
+                let dataToCopy = null;
+
+                if (sourceId === this.state.active) {
+                    if (typeof captureFullState === 'function') {
+                        dataToCopy = captureFullState();
+                    } else {
+                        const savedData = this.getActiveData();
+                        if (savedData) dataToCopy = JSON.parse(JSON.stringify(savedData)); 
+                    }
+                } else {
+                    const savedData = this.state.profiles[sourceId].data;
+                    if (savedData) dataToCopy = JSON.parse(JSON.stringify(savedData));
+                }
+
+                document.body.removeChild(overlay);
+                this.createProfile(newName); 
+                
+                if (dataToCopy) {
+                    this.saveCurrent(dataToCopy);
+                    if (typeof loadState === 'function') loadState(dataToCopy);
+                }
+            };
+        });
     },
 
     renameProfile(id, newName) {
@@ -275,7 +422,7 @@ const ProfileManager = {
     renderModal() {
         if (typeof MODAL_SETTINGS !== 'undefined' && !MODAL_SETTINGS.accountManager) {
             MODAL_SETTINGS.accountManager = {
-                title: "ACCOUNT MANAGER",
+                title: "PROFILE MANAGER",
                 headerColor: "#ebf8fa",
                 titleColor: "#000000",
                 disclaimer: ""
@@ -285,7 +432,13 @@ const ProfileManager = {
         const textFormat = `font-family: 'Fredoka', sans-serif !important; font-size: 1rem !important; color: #000000 !important; -webkit-text-stroke: 0px transparent !important; text-shadow: none !important; font-weight: 600 !important; letter-spacing: 0.5px;`;
         
         const gearBtnStyle = `padding: 6px 12px; border-radius: 8px; border: 2px solid #000; background-color: #00b0ff; cursor: pointer; box-shadow: inset 0 -3px 0 #005680; display: flex; align-items: center; justify-content: center; transition: transform 0.1s;`;
-        const addBtnStyle = `padding: 8px 14px; border-radius: 8px; border: 2px solid #000; background-color: #00b0ff; cursor: pointer; box-shadow: inset 0 -3px 0 #005680; display: flex; align-items: center; justify-content: center; transition: transform 0.1s;`;
+        
+        const createBtnStyle = `
+            padding: 12px 24px; border-radius: 8px; border: 2px solid #000; background-color: #00b0ff;
+            cursor: pointer; font-family: 'Fredoka One', 'Fredoka', sans-serif; font-weight: 500; font-size: 1rem;
+            color: #ffffff; -webkit-text-stroke: 2.5px #000000; paint-order: stroke fill;
+            box-shadow: inset 0 -4px 0 #005680; transition: transform 0.1s; letter-spacing: 0.5px;
+        `;
 
         let listHtml = '<div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">';
         
@@ -338,10 +491,12 @@ const ProfileManager = {
 
         const bodyContentHTML = `
             ${listHtml}
-            <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
-                <input type="text" id="new-account-name" placeholder="New Account Name" style="flex-grow: 1; padding: 10px 15px; border-radius: 8px; border: 2px solid #000; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1rem; outline: none; background-color: #ffffff; color: #000; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); -webkit-text-stroke: 0px transparent;">
-                <button onclick="ProfileManager.promptAccountCreation(document.getElementById('new-account-name').value)" style="${addBtnStyle}" onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='inset 0 -1px 0 #005680';" onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';">
-                    <img src="icons/accadd.png" style="width: 24px; height: 24px; object-fit: contain;">
+            <div style="margin-top: 10px; padding: 0 5px; display: flex; justify-content: center;">
+                <button onclick="ProfileManager.promptAccountCreation()" style="${createBtnStyle}" 
+                    onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='inset 0 -2px 0 #005680';" 
+                    onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -4px 0 #005680';" 
+                    onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -4px 0 #005680';">
+                    Create New Profile
                 </button>
             </div>
         `;
