@@ -88,6 +88,124 @@ const ProfileManager = {
         this.switchProfile(id);
     },
 
+    //Use old save file for new profile
+    promptAccountCreation(name) {
+        if (!name.trim()) return;
+        
+        // Create a custom popup overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+            z-index: 999999; font-family: 'Fredoka', sans-serif;
+        `;
+        
+        // Wrapper to handle the floating close button
+        const modalWrapper = document.createElement('div');
+        modalWrapper.style.cssText = `
+            display: flex; flex-direction: column; align-items: center; position: relative;
+        `;
+        
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: #fff; border-radius: 12px; border: 2px solid #000;
+            width: 320px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column; overflow: hidden;
+        `;
+
+        const headerStyle = `
+            background-color: #ebf8fa; padding: 12px; border-bottom: 2px solid #000; 
+            text-align: center; display: flex; justify-content: center; align-items: center;
+        `;
+
+        const titleStyle = `
+            font-family: 'Fredoka', sans-serif; font-size: 1.1rem; font-weight: 700; color: #fff; 
+            -webkit-text-stroke: 1.5px #000; paint-order: stroke fill; letter-spacing: 1px; text-transform: uppercase;
+        `;
+        
+        // Updated button style: Fredoka One, 2px black stroke, 700 weight
+        const btnStyle = (bg, shadow) => `
+            padding: 12px; border-radius: 8px; border: 2px solid #000; background-color: ${bg};
+            cursor: pointer; font-family: 'Fredoka One', 'Fredoka', sans-serif; font-weight: 600; font-size: 1rem; 
+            color: #ffffff; 
+            box-shadow: inset 0 -4px 0 ${shadow}; transition: transform 0.1s; width: 100%; letter-spacing: 0.5px;
+        `;
+        
+        modal.innerHTML = `
+            <div style="${headerStyle}">
+                <span style="${titleStyle}">SETUP ACCOUNT</span>
+            </div>
+            <div style="padding: 20px; text-align: center; display: flex; flex-direction: column; gap: 12px;">
+                <button id="btn-brand-new" style="${btnStyle('#00b0ff', '#005680')}">Brand New</button>
+                <button id="btn-import-old" style="${btnStyle('#ffcc00', '#b38f00')}">Import Old Save File</button>
+            </div>
+        `;
+        
+        // Create the floating Red X button
+        const closeBtnWrapper = document.createElement('div');
+        closeBtnWrapper.style.cssText = `margin-top: -16px; z-index: 10;`;
+        
+        closeBtnWrapper.innerHTML = `
+            <button id="btn-cancel-create" style="
+                width: 32px; height: 32px; border-radius: 50%; border: 2px solid #000;
+                background-color: #ff4d4d; box-shadow: inset 0 -3px 0 #cc0000;
+                cursor: pointer; display: flex; align-items: center; justify-content: center;
+                transition: transform 0.1s; padding: 0;
+            ">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 1px 0px #000);">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        `;
+        
+        modalWrapper.appendChild(modal);
+        modalWrapper.appendChild(closeBtnWrapper);
+        overlay.appendChild(modalWrapper);
+        document.body.appendChild(overlay);
+        
+        // Add tactile click effects
+        const buttons = overlay.querySelectorAll('button');
+        buttons.forEach(btn => {
+            btn.onmousedown = () => { btn.style.transform = 'translateY(2px)'; };
+            btn.onmouseup = () => { btn.style.transform = 'translateY(0)'; };
+            btn.onmouseleave = () => { btn.style.transform = 'translateY(0)'; };
+        });
+
+        // Action: Brand New
+        document.getElementById('btn-brand-new').onclick = () => {
+            document.body.removeChild(overlay);
+            this.createProfile(name); 
+        };
+
+        // Action: Import Old Save
+        document.getElementById('btn-import-old').onclick = () => {
+            document.body.removeChild(overlay);
+            this.createProfile(name); 
+            
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.style.display = 'none';
+            fileInput.onchange = () => {
+                if (typeof uploadData === 'function') {
+                    uploadData(fileInput); 
+                }
+            };
+            document.body.appendChild(fileInput);
+            fileInput.click();
+            
+            setTimeout(() => { 
+                if (document.body.contains(fileInput)) document.body.removeChild(fileInput); 
+            }, 5000);
+        };
+
+        // Action: Cancel (Red X)
+        document.getElementById('btn-cancel-create').onclick = () => {
+            document.body.removeChild(overlay);
+        };
+    },
+
     renameProfile(id, newName) {
         if (!newName.trim() || !this.state.profiles[id]) return;
         this.state.profiles[id].name = newName.trim();
@@ -222,7 +340,7 @@ const ProfileManager = {
             ${listHtml}
             <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
                 <input type="text" id="new-account-name" placeholder="New Account Name" style="flex-grow: 1; padding: 10px 15px; border-radius: 8px; border: 2px solid #000; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 1rem; outline: none; background-color: #ffffff; color: #000; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); -webkit-text-stroke: 0px transparent;">
-                <button onclick="ProfileManager.createProfile(document.getElementById('new-account-name').value)" style="${addBtnStyle}" onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='inset 0 -1px 0 #005680';" onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';">
+                <button onclick="ProfileManager.promptAccountCreation(document.getElementById('new-account-name').value)" style="${addBtnStyle}" onmousedown="this.style.transform='translateY(2px)'; this.style.boxShadow='inset 0 -1px 0 #005680';" onmouseup="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='inset 0 -3px 0 #005680';">
                     <img src="icons/accadd.png" style="width: 24px; height: 24px; object-fit: contain;">
                 </button>
             </div>
