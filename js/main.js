@@ -400,17 +400,26 @@ function captureFullState() {
 }
 
 function loadState(d) {
+
+    document.querySelectorAll('input, select, textarea').forEach(el => {
+        el.setAttribute('autocomplete', 'off');
+    });
+
     if (d.setupLevels && typeof setupLevels !== 'undefined') { Object.keys(setupLevels).forEach(k => delete setupLevels[k]); Object.assign(setupLevels, d.setupLevels); }
     if (d.planQueue && typeof planQueue !== 'undefined') { planQueue.length = 0; planQueue.push(...d.planQueue); }
+    
+    const dateInput = document.getElementById('start-date');
+    if (dateInput) dateInput.removeAttribute('data-exact-time');
+
     const sDate = d.startDate || d.start; 
     if (sDate) { 
         safeSetVal('start-date', sDate); 
         safeSyncDropdowns(sDate, 'dm'); 
-        if (d.exactStartDate) {
-            const dateInput = document.getElementById('start-date');
-            if (dateInput) dateInput.setAttribute('data-exact-time', d.exactStartDate);
+        if (d.exactStartDate && dateInput) {
+            dateInput.setAttribute('data-exact-time', d.exactStartDate);
         }
     }
+
     if (d.warConfig && typeof warConfig !== 'undefined') { 
         warConfig = d.warConfig; 
         if (warConfig.min === undefined) warConfig.min = 0; 
@@ -724,6 +733,7 @@ function wipeSlateClean() {
     inputIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
+            el.setAttribute('autocomplete', 'off'); // Prevent browser auto-fill issues
             if (el.tagName === 'SELECT' && el.options.length > 0) {
                 
                 let hasEmpty = Array.from(el.options).some(opt => opt.value === '');
@@ -733,6 +743,9 @@ function wipeSlateClean() {
             }
         }
     });
+
+    const dateInput = document.getElementById('start-date');
+    if (dateInput) dateInput.removeAttribute('data-exact-time'); // Stop exact time bleed
 
     if (document.getElementById('eq-avg-tier')) document.getElementById('eq-avg-tier').value = 'Quantum';
     if (document.getElementById('eq-avg-weapon-type')) document.getElementById('eq-avg-weapon-type').value = 'Ranged';
@@ -780,7 +793,7 @@ function safeSyncDropdowns(isoDate, prefix) {
 }
 
 function saveToLocalStorage() {
-    if (!typeof isAppLoaded !== 'undefined' && !isAppLoaded) return; 
+    if (typeof isAppLoaded !== 'undefined' && !isAppLoaded) return; 
     
     if (window.isSwitchingProfile) return; 
     

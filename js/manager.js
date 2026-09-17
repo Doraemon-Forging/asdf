@@ -75,6 +75,8 @@ const ProfileManager = {
             this.saveCurrent(captureFullState());
         }
 
+        window.isSwitchingProfile = true; 
+
         this.state.active = id;
         this.saveToStorage();
 
@@ -82,6 +84,9 @@ const ProfileManager = {
         
         const newData = this.getActiveData() || {}; 
         if (typeof loadState === 'function') loadState(newData);
+
+        window.isSwitchingProfile = false;
+        if (typeof saveToLocalStorage === 'function') saveToLocalStorage(); 
 
         this.closeModal();
     },
