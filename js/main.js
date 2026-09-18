@@ -796,6 +796,8 @@ function saveToLocalStorage() {
     if (typeof isAppLoaded !== 'undefined' && !isAppLoaded) return; 
     
     if (window.isSwitchingProfile) return; 
+
+    if (window.isAppBooting) return; 
     
     try { 
         const d = captureFullState(); 
